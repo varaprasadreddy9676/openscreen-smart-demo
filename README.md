@@ -1,117 +1,134 @@
 <p align="center">
-  <img src="public/openscreen.png" alt="OpenScreen Smart Demo Logo" width="64" />
+  <img src="public/openscreen.png" alt="OpenScreen Smart Demo" width="72" />
 </p>
 
-# OpenScreen Smart Demo
+<h1 align="center">OpenScreen Smart Demo</h1>
 
-**AI-powered smart demo generation built on top of OpenScreen.**
-Automatically converts screen recordings into polished demos by detecting user interactions and applying intelligent editing.
+<p align="center">
+  <strong>AI-powered smart demo generation built on top of OpenScreen.</strong><br/>
+  Automatically converts screen recordings into polished product demos.
+</p>
 
-> Built on top of [OpenScreen](https://github.com/siddharthvaddem/openscreen) — the open-source screen recording tool. Licensed under MIT.
-
----
-
-## What's New in Smart Demo
-
-| Feature | Description |
-|---|---|
-| **Smart Recording** | One-click "Smart" button captures cursor telemetry alongside video |
-| **Auto Zoom** | Automatically zooms into clicks and typing at 1.5× |
-| **Click Highlights** | Animated pulse circles at every detected click (#4F8CFF, 600ms) |
-| **Step Generation** | Auto-generates numbered tutorial steps from interactions |
-| **Inactivity Detection** | Detects silence periods and suggests trim regions |
-| **One-click Apply** | Instantly populates the editor timeline with all generated effects |
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-green" />
+  <img src="https://img.shields.io/badge/built%20on-OpenScreen-blue" />
+  <img src="https://img.shields.io/badge/status-hackathon--MVP-purple" />
+</p>
 
 ---
 
-## How to Use Smart Demo
-
-1. **Select** your screen/window source in the HUD
-2. Click the **✦ Smart** (purple) button to start a Smart Demo recording
-3. **Record** your workflow — open browser, click buttons, type, navigate
-4. **Stop** recording — the editor opens automatically
-5. In the editor, open the **Smart Demo** accordion in the right panel
-6. Click **Generate Smart Demo** → review detected clicks, zooms, steps
-7. Click **Apply Zoom & Highlights** → effects are added to the timeline
-8. Optionally **Trim Silences** to remove inactive periods
-9. **Export** as MP4 or GIF
-
----
-
-## Demo Flow
+## How It Works
 
 ```
-Click ✦ Smart → record normally → stop
-       ↓
-Editor opens + cursor telemetry loaded
-       ↓
-Open "Smart Demo" panel → Generate
-       ↓
-See: clicks / zooms / steps detected
-       ↓
-Apply → polished demo ready to export
+  ┌─────────────┐     ┌──────────────────┐     ┌──────────────────┐     ┌───────────────┐
+  │  Click      │     │  Record screen   │     │  Smart Demo      │     │  Export       │
+  │  ✦ Smart   │ ──▶ │  normally        │ ──▶ │  panel analyses  │ ──▶ │  polished     │
+  │  button     │     │  (cursor tracked)│     │  + applies fx    │     │  MP4 / GIF    │
+  └─────────────┘     └──────────────────┘     └──────────────────┘     └───────────────┘
+```
+
+After recording, the app analyses 10 Hz cursor telemetry to detect:
+
+| Signal | Detection method |
+|---|---|
+| **Click** | Cursor moves → sudden stop → 150–800 ms dwell → resumes |
+| **Typing** | Cursor velocity below threshold for > 1 second |
+| **Window change** | Instantaneous position jump > 60% of screen width |
+| **Navigation** | Fast sweep covering > 30% of screen distance |
+
+From those signals it automatically generates:
+
+- **Zoom regions** — centred on each click, 1.5× scale, 1.5 s duration
+- **Click highlights** — animated pulse circle, `#4F8CFF`, 600 ms
+- **Tutorial steps** — numbered list with timestamps
+- **Trim suggestions** — silence periods > 3 s flagged for removal
+
+---
+
+## Quick Start
+
+```bash
+npm install
+npm run dev          # development (Electron + Vite)
+npm run build:mac    # production macOS build
+```
+
+---
+
+## Smart Demo Usage
+
+1. Select a screen/window source in the HUD overlay
+2. Click the **✦ Smart** purple button → recording starts
+3. Record your workflow naturally (open browser, click, type, navigate)
+4. Click **✦ Smart** again to stop → editor opens automatically
+5. In the editor right panel, open the **Smart Demo** accordion
+6. Click **Generate Smart Demo** → review detected interactions and steps
+7. Click **Apply Zoom & Highlights** → effects added to the timeline
+8. Optionally click **Trim Silences** to cut inactive stretches
+9. Play the preview, then **Export** as MP4 or GIF
+
+---
+
+## Demo Scenario (Hackathon)
+
+The ideal 60-second demo recording:
+
+```
+1. Open Chrome
+2. Navigate to a login page
+3. Click the email field  ← zoom + highlight
+4. Type an email address  ← zoom + typing step
+5. Click the password field ← zoom + highlight
+6. Type a password         ← zoom + typing step
+7. Click Login button      ← zoom + highlight
+8. Wait on dashboard       ← silence detected → trim suggestion
+```
+
+**Result:** ~4 zoom regions, ~3 click highlights, 3–4 tutorial steps, 1 trim suggestion.
+
+---
+
+## New Files Added
+
+```
+src/
+├── smart-demo/
+│   ├── interactionRecorder.ts   # Cursor telemetry → click/type/nav events
+│   ├── timelineAnalyzer.ts      # Events → demo segments with zoom targets
+│   ├── inactivityDetector.ts    # Silence detection for trim suggestions
+│   ├── stepGenerator.ts         # Human-readable tutorial step generation
+│   └── effects/
+│       ├── autoZoom.ts          # ZoomRegion[] from click segments
+│       └── clickHighlight.ts    # AnnotationRegion[] pulse circles
+└── ui/
+    └── SmartDemoPanel.tsx       # React panel in the editor sidebar
 ```
 
 ---
 
 ## Core Features (from OpenScreen)
 
-- Record your whole screen or specific apps
-- Manual zoom regions (customizable depth levels)
-- Background wallpapers, gradients, solid colors
-- Annotations (text, arrows, images)
-- Trim, speed regions, motion blur
-- Export in different aspect ratios and resolutions (MP4 / GIF)
-
----
-
-## Smart Demo Architecture
-
-```
-src/
-├── smart-demo/
-│   ├── interactionRecorder.ts    # Cursor telemetry → click/type/nav events
-│   ├── timelineAnalyzer.ts       # Events → demo segments with zoom targets
-│   ├── inactivityDetector.ts     # Silence detection for trim suggestions
-│   ├── stepGenerator.ts          # Human-readable tutorial step generation
-│   └── effects/
-│       ├── autoZoom.ts           # ZoomRegion generation from clicks
-│       └── clickHighlight.ts     # AnnotationRegion pulse circles
-└── ui/
-    └── SmartDemoPanel.tsx        # React panel integrated in the editor
-```
-
-### Interaction Detection
-
-The system analyses 10 Hz cursor telemetry captured by Electron's main process:
-
-- **Click** — moving cursor → sudden stop → dwell 150–800 ms → movement resumes
-- **Typing** — cursor velocity < threshold for > 1 second
-- **Window change** — instantaneous position jump > 60% of screen
-- **Navigation** — fast sweep > 30% screen distance
-
-All processing is 100% client-side. No external AI API required.
+- Screen / window recording at up to 4K 60 fps
+- Timeline editor: zoom, trim, speed, annotation regions
+- Background wallpapers, gradients, solid colours
+- Annotations: text, arrows, images
+- Export: MP4 and GIF at configurable quality
 
 ---
 
 ## Built With
 
-- Electron · React · TypeScript · Vite · PixiJS · Tailwind CSS
+Electron · React · TypeScript · Vite · PixiJS · Tailwind CSS
 
 ---
 
 ## Attribution
 
-This project is a fork and extension of **OpenScreen** by [@siddharthvaddem](https://github.com/siddharthvaddem/openscreen).
-Original project: https://github.com/siddharthvaddem/openscreen
-License: MIT
+Built on top of **OpenScreen** by [@siddharthvaddem](https://github.com/siddharthvaddem)
+Original: https://github.com/siddharthvaddem/openscreen · MIT License
 
 ---
 
-## Installation
+## Pitch
 
-```bash
-npm install
-npm run dev        # development
-npm run build:mac  # production build (macOS)
-```
+> OpenScreen Smart Demo is an AI-assisted demo creation tool that automatically detects user interactions in screen recordings and converts them into polished product demos with smart zooms, click highlights, and generated step-by-step guidance — all with one click.
