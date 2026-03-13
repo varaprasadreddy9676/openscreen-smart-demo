@@ -918,7 +918,7 @@ export default function VideoEditor() {
 
           const saveResult = await window.electronAPI.saveExportedVideo(arrayBuffer, fileName);
 
-          if (saveResult.cancelled || saveResult.canceled) {
+          if (saveResult.canceled) {
             toast.info('Export canceled');
           } else if (saveResult.success && saveResult.path) {
             showExportSuccessToast(saveResult.path);
@@ -1045,7 +1045,7 @@ export default function VideoEditor() {
 
           const saveResult = await window.electronAPI.saveExportedVideo(arrayBuffer, fileName);
 
-          if (saveResult.cancelled || saveResult.canceled) {
+          if (saveResult.canceled) {
             toast.info('Export canceled');
           } else if (saveResult.success && saveResult.path) {
             showExportSuccessToast(saveResult.path);

@@ -50,8 +50,11 @@ interface Window {
     revealInFolder: (filePath: string) => Promise<{ success: boolean; error?: string; message?: string }>,
     getShortcuts: () => Promise<Record<string, unknown> | null>
     saveShortcuts: (shortcuts: unknown) => Promise<{ success: boolean; error?: string }>
+    getAssetBasePath: () => Promise<string | null>
     hudOverlayHide: () => void;
     hudOverlayClose: () => void;
+    setSmartDemoMode: (value: boolean) => Promise<{ success: boolean }>
+    getSmartDemoMode: () => Promise<{ value: boolean }>
   }
 }
 

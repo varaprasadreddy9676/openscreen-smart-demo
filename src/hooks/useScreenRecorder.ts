@@ -31,15 +31,23 @@ const CHROME_MEDIA_SOURCE = "desktop";
 const RECORDING_FILE_PREFIX = "recording-";
 const VIDEO_FILE_EXTENSION = ".webm";
 
+export interface UseScreenRecorderOptions {
+  /** Pass a device ID (or "default") to mix microphone audio into the recording. */
+  micDeviceId?: string | null;
+}
+
 type UseScreenRecorderReturn = {
   recording: boolean;
   toggleRecording: () => void;
 };
 
-export function useScreenRecorder(): UseScreenRecorderReturn {
+export function useScreenRecorder(
+  options?: UseScreenRecorderOptions
+): UseScreenRecorderReturn {
   const [recording, setRecording] = useState(false);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
+  const micStream = useRef<MediaStream | null>(null);
   const chunks = useRef<Blob[]>([]);
   const startTime = useRef<number>(0);
 
@@ -75,6 +83,10 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       if (stream.current) {
         stream.current.getTracks().forEach(track => track.stop());
       }
+      if (micStream.current) {
+        micStream.current.getTracks().forEach(track => track.stop());
+        micStream.current = null;
+      }
       mediaRecorder.current.stop();
       setRecording(false);
 
@@ -84,7 +96,7 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 
   useEffect(() => {
     let cleanup: (() => void) | undefined;
-    
+
     if (window.electronAPI?.onStopRecordingFromTray) {
       cleanup = window.electronAPI.onStopRecordingFromTray(() => {
         stopRecording.current();
@@ -93,13 +105,17 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
 
     return () => {
       if (cleanup) cleanup();
-      
+
       if (mediaRecorder.current?.state === "recording") {
         mediaRecorder.current.stop();
       }
       if (stream.current) {
         stream.current.getTracks().forEach(track => track.stop());
         stream.current = null;
+      }
+      if (micStream.current) {
+        micStream.current.getTracks().forEach(track => track.stop());
+        micStream.current = null;
       }
     };
   }, []);
@@ -141,22 +157,45 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       }
 
       let { width = DEFAULT_WIDTH, height = DEFAULT_HEIGHT, frameRate = TARGET_FRAME_RATE } = videoTrack.getSettings();
-      
+
       // Ensure dimensions are divisible by 2 for VP9/AV1 codec compatibility
       width = Math.floor(width / CODEC_ALIGNMENT) * CODEC_ALIGNMENT;
       height = Math.floor(height / CODEC_ALIGNMENT) * CODEC_ALIGNMENT;
-      
+
+      // Build the combined stream (video + optional mic audio)
+      const combinedStream = new MediaStream([videoTrack]);
+
+      const micDeviceId = options?.micDeviceId;
+      if (micDeviceId) {
+        try {
+          const audioConstraints: MediaTrackConstraints =
+            micDeviceId === "default"
+              ? {}
+              : { deviceId: { exact: micDeviceId } };
+
+          const ms = await navigator.mediaDevices.getUserMedia({
+            audio: audioConstraints,
+            video: false,
+          });
+          micStream.current = ms;
+          ms.getAudioTracks().forEach(t => combinedStream.addTrack(t));
+          console.log(`Microphone added: ${ms.getAudioTracks()[0]?.label}`);
+        } catch (err) {
+          console.warn("Could not capture microphone — recording video only:", err);
+        }
+      }
+
       const videoBitsPerSecond = computeBitrate(width, height);
       const mimeType = selectMimeType();
 
       console.log(
         `Recording at ${width}x${height} @ ${frameRate ?? TARGET_FRAME_RATE}fps using ${mimeType} / ${Math.round(
           videoBitsPerSecond / BITS_PER_MEGABIT
-        )} Mbps`
+        )} Mbps${micDeviceId ? " + mic" : ""}`
       );
-      
+
       chunks.current = [];
-      const recorder = new MediaRecorder(stream.current, {
+      const recorder = new MediaRecorder(combinedStream, {
         mimeType,
         videoBitsPerSecond,
       });
@@ -204,6 +243,10 @@ export function useScreenRecorder(): UseScreenRecorderReturn {
       if (stream.current) {
         stream.current.getTracks().forEach(track => track.stop());
         stream.current = null;
+      }
+      if (micStream.current) {
+        micStream.current.getTracks().forEach(track => track.stop());
+        micStream.current = null;
       }
     }
   };

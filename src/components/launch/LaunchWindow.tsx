@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import styles from "./LaunchWindow.module.css";
 import { useScreenRecorder } from "../../hooks/useScreenRecorder";
 import { Button } from "../ui/button";
@@ -8,11 +8,50 @@ import { MdMonitor } from "react-icons/md";
 import { RxDragHandleDots2 } from "react-icons/rx";
 import { FaFolderMinus } from "react-icons/fa6";
 import { FiMinus, FiX } from "react-icons/fi";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Mic, MicOff } from "lucide-react";
 import { ContentClamp } from "../ui/content-clamp";
 
 export function LaunchWindow() {
-  const { recording, toggleRecording } = useScreenRecorder();
+  // ── Mic state ────────────────────────────────────────────────────────────────
+  const [micEnabled, setMicEnabled] = useState(false);
+  const [micDeviceId, setMicDeviceId] = useState<string>("default");
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
+  const [showMicMenu, setShowMicMenu] = useState(false);
+  const micMenuRef = useRef<HTMLDivElement>(null);
+
+  // Enumerate audio input devices
+  useEffect(() => {
+    const enumerateAudio = async () => {
+      try {
+        // Brief permission probe so labels are populated
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const inputs = devices.filter(d => d.kind === "audioinput");
+        setAudioDevices(inputs);
+      } catch {
+        // No permission yet — will retry after user grants mic
+      }
+    };
+    enumerateAudio();
+    navigator.mediaDevices.addEventListener("devicechange", enumerateAudio);
+    return () => navigator.mediaDevices.removeEventListener("devicechange", enumerateAudio);
+  }, []);
+
+  // Close mic menu when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (micMenuRef.current && !micMenuRef.current.contains(e.target as Node)) {
+        setShowMicMenu(false);
+      }
+    };
+    if (showMicMenu) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showMicMenu]);
+
+  // ── Screen recorder ──────────────────────────────────────────────────────────
+  const { recording, toggleRecording } = useScreenRecorder({
+    micDeviceId: micEnabled ? micDeviceId : null,
+  });
+
   const [recordingStart, setRecordingStart] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [smartDemoActive, setSmartDemoActive] = useState(false);
@@ -38,10 +77,11 @@ export function LaunchWindow() {
   }, [recording, recordingStart]);
 
   const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-    const s = (seconds % 60).toString().padStart(2, '0');
+    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const s = (seconds % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
   };
+
   const [selectedSource, setSelectedSource] = useState("Screen");
   const [hasSelectedSource, setHasSelectedSource] = useState(false);
 
@@ -60,7 +100,7 @@ export function LaunchWindow() {
     };
 
     checkSelectedSource();
-    
+
     const interval = setInterval(checkSelectedSource, 500);
     return () => clearInterval(interval);
   }, []);
@@ -112,21 +152,48 @@ export function LaunchWindow() {
     }
   };
 
+  // ── Mic toggle handler ───────────────────────────────────────────────────────
+  const handleMicClick = async () => {
+    if (recording) return; // don't allow changes mid-recording
+    if (!micEnabled) {
+      // Request permission and refresh device list
+      try {
+        const ms = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        ms.getTracks().forEach(t => t.stop());
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        setAudioDevices(devices.filter(d => d.kind === "audioinput"));
+      } catch {
+        // Permission denied — still toggle UI so user sees disabled state
+      }
+    }
+    setMicEnabled(prev => !prev);
+    setShowMicMenu(false);
+  };
+
+  const handleMicRightClick = (e: React.MouseEvent) => {
+    if (recording) return;
+    e.preventDefault();
+    if (audioDevices.length > 0) setShowMicMenu(prev => !prev);
+  };
+
   return (
     <div className="w-full h-full flex items-center bg-transparent">
       <div
-        className={`w-full max-w-[600px] mx-auto flex items-center justify-between px-4 py-2 ${styles.electronDrag} ${styles.hudBar}`}
+        className={`w-full max-w-[660px] mx-auto flex items-center justify-between px-4 py-2 ${styles.electronDrag} ${styles.hudBar}`}
         style={{
           borderRadius: 16,
-          background: 'linear-gradient(135deg, rgba(28,28,36,0.97) 0%, rgba(18,18,26,0.96) 100%)',
-          backdropFilter: 'blur(16px) saturate(140%)',
-          WebkitBackdropFilter: 'blur(16px) saturate(140%)',
-          border: '1px solid rgba(80,80,120,0.25)',
+          background: "linear-gradient(135deg, rgba(28,28,36,0.97) 0%, rgba(18,18,26,0.96) 100%)",
+          backdropFilter: "blur(16px) saturate(140%)",
+          WebkitBackdropFilter: "blur(16px) saturate(140%)",
+          border: "1px solid rgba(80,80,120,0.25)",
           minHeight: 44,
         }}
       >
-        <div className={`flex items-center gap-1 ${styles.electronDrag}`}> <RxDragHandleDots2 size={18} className="text-white/40" /> </div>
+        <div className={`flex items-center gap-1 ${styles.electronDrag}`}>
+          <RxDragHandleDots2 size={18} className="text-white/40" />
+        </div>
 
+        {/* Source selector */}
         <Button
           variant="link"
           size="sm"
@@ -140,6 +207,7 @@ export function LaunchWindow() {
 
         <div className="w-px h-6 bg-white/30" />
 
+        {/* Standard record button */}
         <Button
           variant="link"
           size="sm"
@@ -154,8 +222,13 @@ export function LaunchWindow() {
             </>
           ) : (
             <>
-              <BsRecordCircle size={14} className={hasSelectedSource && !smartDemoActive ? "text-white" : "text-white/50"} />
-              <span className={hasSelectedSource && !smartDemoActive ? "text-white" : "text-white/50"}>Record</span>
+              <BsRecordCircle
+                size={14}
+                className={hasSelectedSource && !smartDemoActive ? "text-white" : "text-white/50"}
+              />
+              <span className={hasSelectedSource && !smartDemoActive ? "text-white" : "text-white/50"}>
+                Record
+              </span>
             </>
           )}
         </Button>
@@ -186,7 +259,65 @@ export function LaunchWindow() {
 
         <div className="w-px h-6 bg-white/30" />
 
+        {/* Mic toggle button */}
+        <div className={`relative flex-1 flex justify-center ${styles.electronNoDrag}`} ref={micMenuRef}>
+          <Button
+            variant="link"
+            size="sm"
+            onClick={handleMicClick}
+            onContextMenu={handleMicRightClick}
+            disabled={recording}
+            className="gap-1 bg-transparent hover:bg-transparent px-0 text-center text-xs"
+            title={
+              micEnabled
+                ? `Mic on: ${audioDevices.find(d => d.deviceId === micDeviceId)?.label || "Default"} — right-click to change`
+                : "Mic off — click to enable microphone recording"
+            }
+          >
+            {micEnabled ? (
+              <>
+                <Mic size={14} className="text-green-400" />
+                <span className="text-green-400">Mic</span>
+              </>
+            ) : (
+              <>
+                <MicOff size={14} className="text-white/40" />
+                <span className="text-white/40">Mic</span>
+              </>
+            )}
+          </Button>
 
+          {/* Device picker dropdown */}
+          {showMicMenu && audioDevices.length > 0 && (
+            <div
+              className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#1c1c24] border border-white/10 rounded-lg shadow-xl z-50 min-w-[180px] py-1"
+              style={{ backdropFilter: "blur(12px)" }}
+            >
+              <p className="text-[10px] text-white/30 px-3 py-1 uppercase tracking-widest">
+                Microphone
+              </p>
+              {audioDevices.map(device => (
+                <button
+                  key={device.deviceId}
+                  className={`w-full text-left text-[11px] px-3 py-1.5 hover:bg-white/10 truncate transition-colors ${
+                    micDeviceId === device.deviceId ? "text-green-400" : "text-white/70"
+                  }`}
+                  onClick={() => {
+                    setMicDeviceId(device.deviceId);
+                    setMicEnabled(true);
+                    setShowMicMenu(false);
+                  }}
+                >
+                  {device.label || `Microphone ${device.deviceId.slice(0, 6)}`}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="w-px h-6 bg-white/30" />
+
+        {/* Open file */}
         <Button
           variant="link"
           size="sm"
@@ -198,7 +329,7 @@ export function LaunchWindow() {
           <span className={styles.folderText}>Open</span>
         </Button>
 
-         {/* Separator before hide/close buttons */}
+        {/* Separator before hide/close buttons */}
         <div className="w-px h-6 bg-white/30 mx-2" />
         <Button
           variant="link"
@@ -207,8 +338,7 @@ export function LaunchWindow() {
           title="Hide HUD"
           onClick={sendHudOverlayHide}
         >
-          <FiMinus size={18} style={{ color: '#fff', opacity: 0.7 }} />
-          
+          <FiMinus size={18} style={{ color: "#fff", opacity: 0.7 }} />
         </Button>
 
         <Button
@@ -218,7 +348,7 @@ export function LaunchWindow() {
           title="Close App"
           onClick={sendHudOverlayClose}
         >
-          <FiX size={18} style={{ color: '#fff', opacity: 0.7 }} />
+          <FiX size={18} style={{ color: "#fff", opacity: 0.7 }} />
         </Button>
       </div>
     </div>

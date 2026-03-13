@@ -22,7 +22,7 @@ export function createHudOverlayWindow(): BrowserWindow {
   const { workArea } = primaryDisplay;
 
 
-  const windowWidth = 600;
+  const windowWidth = 720;
   const windowHeight = 100;
 
   const x = Math.floor(workArea.x + (workArea.width - windowWidth) / 2);
