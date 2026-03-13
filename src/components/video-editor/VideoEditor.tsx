@@ -918,15 +918,11 @@ export default function VideoEditor() {
 
           const saveResult = await window.electronAPI.saveExportedVideo(arrayBuffer, fileName);
 
-          if (saveResult.cancelled) {
-            toast.info('Export cancelled');
+          if (saveResult.cancelled || saveResult.canceled) {
+            toast.info('Export canceled');
           } else if (saveResult.success && saveResult.path) {
             showExportSuccessToast(saveResult.path);
             setExportedFilePath(saveResult.path);
-          if (saveResult.canceled) {
-            toast.info('Export canceled');
-          } else if (saveResult.success) {
-            toast.success(`GIF exported successfully to ${saveResult.path}`);
           } else {
             setExportError(saveResult.message || 'Failed to save GIF');
             toast.error(saveResult.message || 'Failed to save GIF');
@@ -1049,15 +1045,11 @@ export default function VideoEditor() {
 
           const saveResult = await window.electronAPI.saveExportedVideo(arrayBuffer, fileName);
 
-          if (saveResult.cancelled) {
-            toast.info('Export cancelled');
+          if (saveResult.cancelled || saveResult.canceled) {
+            toast.info('Export canceled');
           } else if (saveResult.success && saveResult.path) {
             showExportSuccessToast(saveResult.path);
             setExportedFilePath(saveResult.path);
-          if (saveResult.canceled) {
-            toast.info('Export canceled');
-          } else if (saveResult.success) {
-            toast.success(`Video exported successfully to ${saveResult.path}`);
           } else {
             setExportError(saveResult.message || 'Failed to save video');
             toast.error(saveResult.message || 'Failed to save video');
